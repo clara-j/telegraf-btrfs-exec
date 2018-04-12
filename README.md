@@ -1,6 +1,16 @@
 # telegraf-btrfs-exec
 Python script that can be used to capture BTRFS information in telegraf
 
+# What does it capture
+Currently it captures the following information for all the pools mounted at the time of running
+
+## $btrfs device stat
+* write_io_errs
+* read_io_errs
+* flush_io_errs
+* corruption_errs
+* generation_errs
+
 # Usage
 1. Install and place btrfs.read.py in location accessible by telgraf.   For example /etc/telegraf/btrfs.read.py
 2. Grant telegraf permission to sudo btrfs command without password by adding the following to /etc/sudoers
@@ -17,6 +27,9 @@ telegraf ALL=(root) NOPASSWD: /usr/local/bin/btrfs
    data_format = "influx"
 ```
 
+# Requirements
+* python
+* btrfs-tools
 
 # Donation
 If you find this usefull and you would like to support please the use option below.
