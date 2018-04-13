@@ -11,6 +11,28 @@ Currently it captures the following information for all the pools mounted at the
 * corruption_errs
 * generation_errs
 
+## $btrfs filesystem df
+* Data (total, used, free)
+* System (total, used, free)
+* Metadata (total, used, free)
+* GlobalReserve (total, used, free)
+
+## $btrfs filesystem usage
+* Device_size
+* Device_allocated
+* Device_unallocated
+* Device_missing
+* Used
+* Free_(estimated)
+* Data_ratio
+* Metadata_ratio
+* Global_reserve
+* Data (Per Device)
+* Metadata (Per Device)
+* System (Per Device)
+* Unallocated (Per Device)
+
+
 # Usage
 1. Install and place btrfs.read.py in location accessible by telgraf.   For example /etc/telegraf/btrfs.read.py
 2. Grant telegraf permission to sudo btrfs command without password by adding the following to /etc/sudoers
