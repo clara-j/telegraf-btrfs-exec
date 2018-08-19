@@ -6,11 +6,11 @@ DEBUG = 0
 
 def getPools(excludeList):
      pools = []
-     poolsRAW = subprocess.check_output("findmnt -nt btrfs", shell=True)
+     poolsRAW = subprocess.check_output("findmnt -o TARGET --list -nt  btrfs", shell=True)
      poolsLine  = poolsRAW.split('\n')
      for i in range(len(poolsLine)):
-          pool = poolsLine[i].split(' ')[0].strip()
-          if len(pool) > 1:
+          pool = poolsLine[i].replace('\xe2','').replace('\xe2','').split(' ')[0].strip()
+          if len(pool) > 0:
                pools.append(pool)
      return pools
 
