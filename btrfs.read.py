@@ -57,6 +57,8 @@ def getFileSystemUsageMeasurements(pool):
                 measurementLinesSection = measurementLines[j].split(':')
                 metric = measurementLinesSection[0].strip().replace(' ', '_')
                 value = measurementLinesSection[1].strip().split('\t')[0]
+                if "Multiple_profiles" in metric:
+                    continue
                 outArray.append("btrfs,command=" + btrfsType + ",type="+ metric +",pool="+ pool +" value="+ value)
         else:
             type = measurementLines[0].replace(':',',').split(',')[0]
