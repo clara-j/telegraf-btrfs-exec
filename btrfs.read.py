@@ -1,121 +1,134 @@
+#!/usr/bin/env python3
+
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+import logging
+import shutil
 import subprocess
-import collections
+log = logging.getLogger("telegraf-btrfs")
+log.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+logformat = "%(message)s"
+formatter = logging.Formatter(logformat)
+ch.setFormatter(formatter)
+log.addHandler(ch)
 
-DEBUG = 0
+
+def _find_binaries():
+    findmnt = shutil.which("findmnt")
+    btrfs = shutil.which("btrfs")
+    sudo = shutil.which("sudo")
+    return btrfs, findmnt, sudo
 
 
-def getPools(excludeList):
-     pools = []
-     poolsRAW = subprocess.check_output("findmnt -o TARGET --list -nt  btrfs", shell=True)
-     poolsLine  = poolsRAW.split('\n')
-     for i in range(len(poolsLine)):
-          pool = poolsLine[i].replace('\xe2','').replace('\xe2','').split(' ')[0].strip()
-          if len(pool) > 0:
-               pools.append(pool)
-     return pools
+def getPools(excludeList, find_path="findmnt"):
+    poolsRAW = subprocess.Popen([find_path, "-o", "TARGET", "--list",
+                                 "-nt", "btrfs"],
+                                stdout=subprocess.PIPE)
+    output = poolsRAW.communicate()[0].decode("utf-8")
+    output = [p for p in output.split("\n")
+              if p and p not in excludeList]
+    return output
 
-def getFileSystemDFMeasurements(pool):
-    commandString = subprocess.check_output("sudo btrfs filesystem df -b " + pool, shell=True)
 
+def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
+    commandString = subprocess.Popen([sudo, btrfs, "filesystem", "df",
+                                      "-b", pool],
+                                     stdout=subprocess.PIPE)
     btrfsType = "df"
-
-    outArray = []
-
-    #split into section
-    commandArray = commandString.split('\n')
-
-
-    for i in range(len(commandArray)):
-        lineSections =  commandArray[i].replace(':',',').split(',')
+    # split into section
+    for line in commandString.communicate()[0].decode("utf-8").split('\n'):
+        if not line:
+            continue
+        lineSections = line.replace(':', ',').split(',')
         if len(lineSections) > 1:
             metric = lineSections[0].strip()
             raidType = lineSections[1].strip()
             total = lineSections[2].strip()
             used = lineSections[3].strip()
-            free = str(long(total.split('=')[1]) - long(used.split('=')[1]))
+            free = int(total.split('=')[1]) - int(used.split('=')[1])
+            output = "btrfs,command={},".format(btrfsType)
+            output += "type={},".format(metric)
+            output += "raidType={},".format(raidType)
+            output += "pool={}".format(pool)
+            print("{} total={},used={},free={}".format(output, total,
+                                                       used, free))
 
-            outArray.append( "btrfs,command=" + btrfsType + ",type=" + metric + ",raidType="+ raidType +",pool=" + pool + " " + total)
-            outArray.append( "btrfs,command=" + btrfsType + ",type=" + metric + ",raidType="+ raidType +",pool=" + pool + " " + used)
-            outArray.append( "btrfs,command=" + btrfsType + ",type=" + metric + ",raidType=" + raidType + ",pool=" + pool + " free=" + free)
 
-    return outArray
-
-def getFileSystemUsageMeasurements(pool):
-    commandString = subprocess.check_output("sudo btrfs filesystem usage -b " + pool, shell=True)
+def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
+    commandString = subprocess.Popen([sudo, btrfs, "filesystem", "usage",
+                                      "-b", pool],
+                                     stdout=subprocess.PIPE)
     btrfsType = "usage"
-    outArray = []
-
-    #split into section
-    sectionArray = commandString.split('\n\n')
-
-
-    for i in range(len(sectionArray)):
-        #split into rows
-        measurementLines  = sectionArray[i].split('\n')
+    output = "btrfs,command={},pool={}".format(btrfsType, pool)
+    # split into section
+    commandArray = commandString.communicate()[0].decode("utf-8").split('\n\n')
+    for section in commandArray:
+        # split into rows
+        measurementLines = section.split('\n')
         if "Overall:" in measurementLines[0]:
-            for j in range(1, len(measurementLines)):
-                measurementLinesSection = measurementLines[j].split(':')
-                metric = measurementLinesSection[0].strip().replace(' ', '_')
+            # skip the "overall" section with a slice
+            for j in measurementLines[1:]:
+                measurementLinesSection = j.split(':')
+                metric = measurementLinesSection[0].strip()
+                metric = metric.replace(' ', '_').lower()
+                metric = metric.replace("_(estimated)", "")
                 value = measurementLinesSection[1].strip().split('\t')[0]
-                outArray.append("btrfs,command=" + btrfsType + ",type="+ metric +",pool="+ pool +" value="+ value)
+                print("{} {}={}".format(output, metric, value))
         else:
-            type = measurementLines[0].replace(':',',').split(',')[0]
-            for j in range(1, len(measurementLines)):
-                if len(measurementLines[j]) > 1:
-                    measurementLinesSection = measurementLines[j].strip().split('\t')
+            btype = measurementLines[0].replace(':', ',').split(',')[0]
+            for j in measurementLines[1:]:
+                if len(j) > 1:
+                    measurementLinesSection = j.strip().split('\t')
                     drive = measurementLinesSection[0].strip()
                     value = measurementLinesSection[1].strip()
-                    if DEBUG:
-                        print("Drive: " + drive)
-                        print("Type: " + type)
-                        print("Value: " + value)
-                    outArray.append("btrfs,command=" + btrfsType + ",type="+ type +",drive="+ drive +",pool="+ pool +" value="+ value)
-
-    return outArray
+                    log.debug("Drive: {}, Type: {}, Value: {}".format(drive,
+                                                                      btype,
+                                                                      value))
+                    outputstr = "{},drive={}".format(output, drive)
+                    print("{} {}={}".format(outputstr, btype, value))
 
 
-def getDeviceStatMeasurements(pool):
-    statString = subprocess.check_output("sudo btrfs device stat "+ pool, shell=True)
-    statArray = statString.split('\n')
-    outArray = []
+def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
+    statString = subprocess.Popen([sudo, btrfs, "device", "stat", pool],
+                                  stdout=subprocess.PIPE)
+    statArray = statString.communicate()[0].decode("utf-8").split('\n')
     btrfsType = "stat"
-
-    for i in range(len(statArray)):
-        a = statArray[i].split()
+    output = "btrfs,command={},pool={}".format(btrfsType, pool)
+    for stat in statArray:
+        a = stat.split()
         if len(a) > 1:
-             b = a[0].split('.')
-             drive = b[0].replace("[","").replace("]","")
-             metric = b[1]
-             value = a[1]
-             if DEBUG:
-                print("Drive: "+ drive)
-                print("Metric: "+ metric)
-                print("Value: "+ value)
-             outArray.append("btrfs,command=" + btrfsType + ",type="+ metric +",drive="+ drive +",pool="+ pool +" value="+ value)
-    return outArray
+            b = a[0].split('.')
+            drive = b[0].replace("[", "").replace("]", "")
+            metric = b[1]
+            value = a[1]
+            log.debug("Drive: {}, Metric: {}, Value: {}".format(drive,
+                                                                metric,
+                                                                value))
+            outputstr = "{},drive={}".format(output, drive)
+            print("{} {}={}".format(outputstr, metric, value))
 
 
-excludeList = []
-pools = getPools(excludeList)
+def cli_opts():
+    parser = ArgumentParser(description="Collect stats from btrfs volumes",
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--debug", action="store_true", default=False,
+                        help="Show debug information")
+    parser.add_argument("-e", "--exclude-pools", default="",
+                        help="arrays/mounts to exclude (comma-separated)")
+    return parser.parse_args()
 
-if DEBUG:
-    print "----------- Pools -----------"
-    print pools
-    print "----------- Pools -----------"
 
+if __name__ == "__main__":
+    args = cli_opts()
+    if args.debug:
+        log.setLevel(logging.DEBUG)
+    btrfs, findmnt, sudo = _find_binaries()
+    exclude = args.exclude_pools.split(",")
+    pools = getPools(args.exclude_pools, findmnt)
+    log.debug(pools)
 
-for i in range(len(pools)):
-    if DEBUG:
-        print "----------- Measurements -----------"
-        print "Pool: "+ pools[i]
-    deviceStatMeasurements = getDeviceStatMeasurements(pools[i])
-    for j in range(len(deviceStatMeasurements)):
-        print deviceStatMeasurements[j]
-
-    filesystemDFMeasurements = getFileSystemDFMeasurements(pools[i])
-    for j in range(len(filesystemDFMeasurements)):
-        print filesystemDFMeasurements[j]
-
-    filesystemUsageMeasurements = getFileSystemUsageMeasurements(pools[i])
-    for j in range(len(filesystemUsageMeasurements)):
-        print filesystemUsageMeasurements[j]
+    for pool in pools:
+        log.debug("Processing {}".format(pool))
+        getDeviceStatMeasurements(pool)
+        getFileSystemDFMeasurements(pool)
+        getFileSystemUsageMeasurements(pool)
