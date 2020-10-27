@@ -62,11 +62,13 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     output = "btrfs,command={},pool={}".format(btrfsType, pool)
     # split into section
     commandArray = commandString.communicate()[0].decode("utf-8").split('\n\n')
+    drives = {}
     for section in commandArray:
         # split into rows
         measurementLines = section.split('\n')
         if "Overall:" in measurementLines[0]:
             # skip the "overall" section with a slice
+            outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
                 if "Multiple_profiles" in j:
                     continue
@@ -75,7 +77,8 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                 metric = metric.replace(' ', '_').lower()
                 metric = metric.replace("_(estimated)", "")
                 value = measurementLinesSection[1].strip().split('\t')[0]
-                print("{} {}={}".format(output, metric, value))
+                outputstr += "{}={},".format(metric, value)
+            print(outputstr.strip(","))
         else:
             btype = measurementLines[0].replace(':', ',').split(',')[0]
             for j in measurementLines[1:]:
@@ -86,8 +89,15 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                     log.debug("Drive: {}, Type: {}, Value: {}".format(drive,
                                                                       btype,
                                                                       value))
-                    outputstr = "{},drive={}".format(output, drive)
-                    print("{} {}={}".format(outputstr, btype, value))
+                    if drive in drives:
+                        drives[drive][btype] = value
+                    else:
+                        drives[drive] = {btype: value}
+    for drive, data in drives.items():
+        outputstr = "{},drive={} ".format(output, drive)
+        for k, v in data.items():
+            outputstr += "{}={},".format(k, v)
+        print(outputstr.strip(","))
 
 
 def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
@@ -96,6 +106,7 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     statArray = statString.communicate()[0].decode("utf-8").split('\n')
     btrfsType = "stat"
     output = "btrfs,command={},pool={}".format(btrfsType, pool)
+    drives = {}
     for stat in statArray:
         a = stat.split()
         if len(a) > 1:
@@ -106,8 +117,15 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             log.debug("Drive: {}, Metric: {}, Value: {}".format(drive,
                                                                 metric,
                                                                 value))
-            outputstr = "{},drive={}".format(output, drive)
-            print("{} {}={}".format(outputstr, metric, value))
+            if drive in drives:
+                drives[drive][metric] = value
+            else:
+                drives[drive] = {metric: value}
+    for drive, data in drives.items():
+        outputstr = "{},drive={} ".format(output, drive)
+        for k, v in data.items():
+            outputstr += "{}={},".format(k, v)
+        print(outputstr.strip(","))
 
 
 def cli_opts():
