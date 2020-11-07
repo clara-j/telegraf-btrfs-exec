@@ -47,9 +47,8 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             used = lineSections[3].strip()
             free = int(total.split('=')[1]) - int(used.split('=')[1])
             output = "btrfs,command={},".format(btrfsType)
-            output += "type={},".format(metric)
-            output += "raidType={},".format(raidType)
-            output += "pool={}".format(pool)
+            output += "type={},raidType={},pool={}".format(metric, raidType,
+                                                           pool)
             print("{} total={},used={},free={}".format(output, total,
                                                        used, free))
 
