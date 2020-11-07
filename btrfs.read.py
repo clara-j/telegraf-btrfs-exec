@@ -40,17 +40,18 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         if not line:
             continue
         lineSections = line.replace(':', ',').split(',')
-        if len(lineSections) > 1:
-            metric = lineSections[0].strip()
-            raidType = lineSections[1].strip()
-            total = lineSections[2].strip()
-            used = lineSections[3].strip()
-            free = int(total.split('=')[1]) - int(used.split('=')[1])
-            output = "btrfs,command={},".format(btrfsType)
-            output += "type={},raidType={},pool={}".format(metric, raidType,
-                                                           pool)
-            print("{} total={},used={},free={}".format(output, total,
-                                                       used, free))
+        if len(lineSections) < 2:
+            continue
+        metric = lineSections[0].strip()
+        raidType = lineSections[1].strip()
+        total = lineSections[2].strip()
+        used = lineSections[3].strip()
+        free = int(total.split('=')[1]) - int(used.split('=')[1])
+        output = "btrfs,command={},".format(btrfsType)
+        output += "type={},raidType={},pool={}".format(metric, raidType,
+                                                       pool)
+        print("{} total={},used={},free={}".format(output, total,
+                                                   used, free))
 
 
 def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
@@ -81,17 +82,18 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         else:
             btype = measurementLines[0].replace(':', ',').split(',')[0]
             for j in measurementLines[1:]:
-                if len(j) > 1:
-                    measurementLinesSection = j.strip().split('\t')
-                    drive = measurementLinesSection[0].strip()
-                    value = measurementLinesSection[1].strip()
-                    log.debug("Drive: {}, Type: {}, Value: {}".format(drive,
-                                                                      btype,
-                                                                      value))
-                    if drive in drives:
-                        drives[drive][btype] = value
-                    else:
-                        drives[drive] = {btype: value}
+                if len(j) < 2:
+                    continue
+                measurementLinesSection = j.strip().split('\t')
+                drive = measurementLinesSection[0].strip()
+                value = measurementLinesSection[1].strip()
+                log.debug("Drive: {}, Type: {}, Value: {}".format(drive,
+                                                                  btype,
+                                                                  value))
+                if drive in drives:
+                    drives[drive][btype] = value
+                else:
+                    drives[drive] = {btype: value}
     for drive, data in drives.items():
         outputstr = "{},drive={} ".format(output, drive)
         for k, v in data.items():
@@ -108,18 +110,19 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     drives = {}
     for stat in statArray:
         a = stat.split()
-        if len(a) > 1:
-            b = a[0].split('.')
-            drive = b[0].replace("[", "").replace("]", "")
-            metric = b[1]
-            value = a[1]
-            log.debug("Drive: {}, Metric: {}, Value: {}".format(drive,
-                                                                metric,
-                                                                value))
-            if drive in drives:
-                drives[drive][metric] = value
-            else:
-                drives[drive] = {metric: value}
+        if len(a) < 2:
+            continue
+        b = a[0].split('.')
+        drive = b[0].replace("[", "").replace("]", "")
+        metric = b[1]
+        value = a[1]
+        log.debug("Drive: {}, Metric: {}, Value: {}".format(drive,
+                                                            metric,
+                                                            value))
+        if drive in drives:
+            drives[drive][metric] = value
+        else:
+            drives[drive] = {metric: value}
     for drive, data in drives.items():
         outputstr = "{},drive={} ".format(output, drive)
         for k, v in data.items():
