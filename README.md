@@ -37,7 +37,7 @@ Currently it captures the following information for all the pools mounted at the
 1. Install and place btrfs.read.py in location accessible by telgraf.   For example /etc/telegraf/btrfs.read.py
 2. Grant telegraf permission to sudo btrfs command without password by adding a line similar to the following to /etc/sudoers
 ```
-telegraf ALL=(root) NOPASSWD: /usr/local/bin/btrfs
+telegraf  ALL=(root) NOPASSWD: /usr/bin/btrfs filesystem df *, /usr/bin/btrfs device stat *, /usr/bin/btrfs filesystem usage *
 ```
 You can discover the proper btrfs location by issuing `command -v btrfs` on your system.
 
