@@ -50,8 +50,8 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         output = "btrfs,command={},".format(btrfsType)
         output += "type={},raidType={},pool={}".format(metric, raidType,
                                                        pool)
-        print("{} total={},used={},free={}".format(output, total,
-                                                   used, free))
+        print("{} {},{},free={}".format(output, total,
+                                        used, free))
 
 
 def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
