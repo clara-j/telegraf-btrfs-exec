@@ -60,15 +60,17 @@ def scrub_stats(pool, sudo="sudo", btrfs="btrfs"):
     start_match = re.compile("")
     running_match = re.compile(".*running for (.*)")
     finished_match = re.compile(".*finished after (.*)")
-    output = "btrfs,command=scrub,pool={} ".format(pool)
+    output = "btrfs_scrub,pool={} ".format(pool)
     for line in commandString.communicate()[0].decode("utf-8").split("\n"):
         line = line.strip()
-        if not line or any(line.startswith(s) for s in ["scrub status", "no stats"]):
+        if not line or any(line.startswith(s) for s in ["scrub status",
+                                                        "no stats"]):
             continue
         if line.startswith("scrub started"):
             running = running_match.search(line)
             finished = finished_match.search(line)
-            log.debug("Running time: {}, Finished time: {}".format(running, finished.group(0)))
+            log.debug("Running time: {}, Finished time: {}".format(running,
+                                                                   finished.group(0)))
             # start 
         else:
             log.debug("processing {}".format(line))
@@ -87,7 +89,6 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     commandString = subprocess.Popen([sudo, btrfs, "filesystem", "df",
                                       "-b", pool],
                                      stdout=subprocess.PIPE)
-    btrfsType = "df"
     # split into section
     for line in commandString.communicate()[0].decode("utf-8").split("\n"):
         if not line:
@@ -100,9 +101,9 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         total = lineSections[2].strip()
         used = lineSections[3].strip()
         free = int(total.split("=")[1]) - int(used.split("=")[1])
-        output = "btrfs,command=df,"
-        output += "type={},raidType={},pool={}".format(metric, raidType,
-                                                       pool)
+        output = "btrfs_df,type={},raidType={},pool={}".format(metric,
+                                                               raidType,
+                                                               pool)
         print("{} {},{},free={}".format(output, total,
                                         used, free))
 
@@ -135,33 +136,32 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     commandString = subprocess.Popen([sudo, btrfs, "filesystem", "usage",
                                       "-b", pool],
                                      stdout=subprocess.PIPE)
-    btrfsType = "usage"
-    output = "btrfs,command={},pool={}".format(btrfsType, pool)
+    output = "btrfs_usage,pool={}".format(pool)
     # split into section
-    commandArray = commandString.communicate()[0].decode("utf-8").split('\n\n')
+    commandArray = commandString.communicate()[0].decode("utf-8").split("\n\n")
     drives = {}
     for section in commandArray:
         # split into rows
-        measurementLines = section.split('\n')
+        measurementLines = section.split("\n")
         if "Overall:" in measurementLines[0]:
             # skip the "overall" section with a slice
             outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
                 if "Multiple_profiles" in j:
                     continue
-                measurementLinesSection = j.split(':')
+                measurementLinesSection = j.split(":")
                 metric = measurementLinesSection[0].strip()
-                metric = metric.replace(' ', '_').lower()
+                metric = metric.replace(" ", "_").lower()
                 metric = metric.replace("_(estimated)", "")
-                value = measurementLinesSection[1].strip().split('\t')[0]
+                value = measurementLinesSection[1].strip().split("\t")[0]
                 outputstr += "{}={},".format(metric, value)
             print(outputstr.strip(","))
         else:
-            btype = measurementLines[0].replace(':', ',').split(',')[0]
+            btype = measurementLines[0].replace(":", ",").split(",")[0]
             for j in measurementLines[1:]:
                 if len(j) < 2:
                     continue
-                measurementLinesSection = j.strip().split('\t')
+                measurementLinesSection = j.strip().split("\t")
                 drive = measurementLinesSection[0].strip()
                 value = measurementLinesSection[1].strip()
                 log.debug("Drive: {}, Type: {}, Value: {}".format(drive,
@@ -189,8 +189,7 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     statString = subprocess.Popen([sudo, btrfs, "device", "stat", pool],
                                   stdout=subprocess.PIPE)
     statArray = statString.communicate()[0].decode("utf-8").split('\n')
-    btrfsType = "stat"
-    output = "btrfs,command={},pool={}".format(btrfsType, pool)
+    output = "btrfs_stat,pool={}".format(pool)
     drives = {}
     for stat in statArray:
         a = stat.split()
