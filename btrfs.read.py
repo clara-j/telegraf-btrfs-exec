@@ -228,8 +228,7 @@ if __name__ == "__main__":
     if args.debug:
         log.setLevel(logging.DEBUG)
     btrfs, findmnt, sudo = _find_binaries()
-    exclude = args.exclude_pools.split(",")
-    pools = getPools(args.exclude_pools, findmnt)
+    pools = getPools(args.exclude_pools.split(","), findmnt)
     log.debug(pools)
 
     for pool in pools:
