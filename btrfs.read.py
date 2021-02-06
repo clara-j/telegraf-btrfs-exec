@@ -97,10 +97,8 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         lineSections = line.replace(":", ",").split(",")
         if len(lineSections) < 2:
             continue
-        metric = lineSections[0].strip()
-        raidType = lineSections[1].strip()
-        total = lineSections[2].strip()
-        used = lineSections[3].strip()
+        lineSections = [l.strip() for l in lineSections]
+        metric, raidType, total, used = lineSections
         free = int(total.split("=")[1]) - int(used.split("=")[1])
         output = "btrfs_df,type={},raidType={},pool={}".format(metric,
                                                                raidType,
