@@ -64,7 +64,8 @@ def scrub_stats(pool, sudo="sudo", btrfs="btrfs"):
     for line in commandString.communicate()[0].decode("utf-8").split("\n"):
         line = line.strip()
         if not line or any(line.startswith(s) for s in ["scrub status",
-                                                        "no stats"]):
+                                                        "no stats",
+                                                        "UUID"]):
             continue
         if line.startswith("scrub started"):
             running = running_match.search(line)
