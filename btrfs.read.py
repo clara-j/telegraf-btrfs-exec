@@ -57,24 +57,21 @@ def scrub_stats(pool, sudo="sudo", btrfs="btrfs"):
     commandString = subprocess.Popen([sudo, btrfs, "scrub", "status",
                                       "-R", pool],
                                      stdout=subprocess.PIPE)
-    start_match = re.compile("")
-    running_match = re.compile(".*running for (.*)")
-    finished_match = re.compile(".*finished after (.*)")
     output = "btrfs_scrub,pool={} ".format(pool)
+    time_taken_re = "(\d{2}:\d{2}:\d{2})$"
     for line in commandString.communicate()[0].decode("utf-8").split("\n"):
         line = line.strip()
         if not line or any(line.startswith(s) for s in ["scrub status",
                                                         "no stats",
                                                         "UUID"]):
             continue
+        log.debug("processing {}".format(line))
         if line.startswith("scrub started"):
-            running = running_match.search(line)
-            finished = finished_match.search(line)
-            log.debug("Running time: {}, Finished time: {}".format(running,
-                                                                   finished.group(0)))
-            # start 
+            time_taken_match = re.search(time_taken_re, line)
+            hours, minutes, seconds = time_taken_match.group(0).strip().split(":")
+            time_taken = (3600 * int(hours)) + (60 * int(minutes)) + int(seconds)
+            output += "time_taken={},".format(time_taken)
         else:
-            log.debug("processing {}".format(line))
             key, value = line.split(":")
             output += "{}={},".format(key.strip(), value.strip())
     print(output.strip(","))
@@ -149,6 +146,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                 if any(k in j for k in ["Multiple_profiles", "statfs"]):
                     continue
                 measurementLinesSection = j.split(":")
+                # separate lines to meet flake8 requirements
                 metric = measurementLinesSection[0].strip()
                 metric = metric.replace(" ", "_").lower()
                 metric = metric.replace("_(estimated)", "")
