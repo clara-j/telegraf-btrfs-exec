@@ -146,7 +146,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             # skip the "overall" section with a slice
             outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
-                if "Multiple_profiles" in j:
+                if any(k in j for k in ["Multiple_profiles", "statfs"]):
                     continue
                 measurementLinesSection = j.split(":")
                 metric = measurementLinesSection[0].strip()
