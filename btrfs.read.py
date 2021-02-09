@@ -33,7 +33,9 @@ def getPools(excludeList, find_path="findmnt"):
 
 def scrub_stats(pool, sudo="sudo", btrfs="btrfs"):
     """
+    # one of the following
     scrub status for b24cf3ce-6063-4c63-8141-8c080e6d9bf4
+    UUID:             25cc55b6-cb1b-4aa6-917b-d979c0567c1b
         # one of the following:
          no stats available
          scrub started at Sat Nov  7 21:24:20 2020, running for 00:00:25
