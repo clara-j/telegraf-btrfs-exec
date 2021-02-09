@@ -151,8 +151,8 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                 # separate lines to meet flake8 requirements
                 metric = measurementLinesSection[0].strip()
                 metric = metric.replace(" ", "_").lower()
-                metric = metric.replace("_(estimated)", "estimated")
-                metric = metric.replace("_(statfs,_df)", "statfs")
+                metric = metric.replace("_(estimated)", "_estimated")
+                metric = metric.replace("_(statfs,_df)", "_statfs")
                 value = measurementLinesSection[1].strip().split("\t")[0]
                 outputstr += "{}={},".format(metric, value)
             print(outputstr.strip(","))
