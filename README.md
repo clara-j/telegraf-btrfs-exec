@@ -18,19 +18,20 @@ Currently it captures the following information for all the pools mounted at the
 * GlobalReserve (total, used, free)
 
 ## $btrfs filesystem usage
-* Device_size
-* Device_allocated
-* Device_unallocated
-* Device_missing
-* Used
-* Free_(estimated)
-* Data_ratio
-* Metadata_ratio
-* Global_reserve
-* Data (Per Device)
-* Metadata (Per Device)
-* System (Per Device)
-* Unallocated (Per Device)
+* device_size
+* device_allocated
+* device_unallocated
+* device_missing
+* used
+* free_estimated
+* free_statfs (btrfs-progs >= 5.10)
+* data_ratio
+* metadata_ratio
+* global_reserve
+* data (Per Device)
+* metadata (Per Device)
+* system (Per Device)
+* unallocated (Per Device)
 
 ## $btrfs scrub status
 * time_taken
