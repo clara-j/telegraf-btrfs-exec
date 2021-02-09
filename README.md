@@ -5,11 +5,11 @@ Python script that can be used to capture BTRFS information in telegraf
 Currently it captures the following information for all the pools mounted at the time of running
 
 ## $btrfs device stat
-* write_io_errs
-* read_io_errs
-* flush_io_errs
-* corruption_errs
-* generation_errs
+* write_io_errs (per device)
+* read_io_errs (per device)
+* flush_io_errs (per device)
+* corruption_errs (per device)
+* generation_errs (per device)
 
 ## $btrfs filesystem df
 * Data (total, used, free)
@@ -32,12 +32,29 @@ Currently it captures the following information for all the pools mounted at the
 * System (Per Device)
 * Unallocated (Per Device)
 
+## $btrfs scrub status
+* time_taken
+* data_extents_scrubbed
+* tree_extents_scrubbed
+* data_bytes_scrubbed
+* tree_bytes_scrubbed
+* read_errors
+* csum_errors
+* verify_errors
+* no_csum
+* csum_discards
+* super_errors
+* malloc_errors
+* uncorrectable_errors
+* unverified_errors
+* corrected_errors
+* last_physical
 
 # Usage
 1. Install and place btrfs.read.py in location accessible by telgraf.   For example /etc/telegraf/btrfs.read.py
 2. Grant telegraf permission to sudo btrfs command without password by adding a line similar to the following to /etc/sudoers
 ```
-telegraf  ALL=(root) NOPASSWD: /usr/bin/btrfs filesystem df *, /usr/bin/btrfs device stat *, /usr/bin/btrfs filesystem usage *
+telegraf ALL=(root) NOPASSWD: /usr/bin/btrfs filesystem df *, /usr/bin/btrfs device stat *, /usr/bin/btrfs filesystem usage *
 ```
 You can discover the proper btrfs location by issuing `command -v btrfs` on your system.
 
@@ -52,10 +69,10 @@ You can discover the proper btrfs location by issuing `command -v btrfs` on your
 ```
 
 # Requirements
-* python
+* python3
 * btrfs-tools
 
 # Donation
-If you find this usefull and you would like to support please the use option below.
+If you find this useful and you would like to support please the use option below.
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=jason%2ep%2eclara%40gmail%2ecom&lc=CA&item_name=Jason%20Clara&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
