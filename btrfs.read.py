@@ -112,10 +112,12 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         Device unallocated:		      229633949696
         Device missing:		                 0
         Used:			       10759409664
-        Free (estimated):		      233004806144	(min: 233004806144)
+        Free (estimated):              4.40TiB      (min: 2.94TiB)
+        Free (statfs, df):             3.32TiB
         Data ratio:			              1.00
         Metadata ratio:		              1.00
         Global reserve:		          26869760	(used: 0)
+        Multiple profiles:              no
 
     Data,single: Size:13967032320, Used:10596175872
        /dev/md125	13967032320
@@ -143,13 +145,14 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             # skip the "overall" section with a slice
             outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
-                if any(k in j for k in ["Multiple_profiles", "statfs"]):
+                if any(k in j for k in ["Multiple_profiles"]):
                     continue
                 measurementLinesSection = j.split(":")
                 # separate lines to meet flake8 requirements
                 metric = measurementLinesSection[0].strip()
                 metric = metric.replace(" ", "_").lower()
-                metric = metric.replace("_(estimated)", "")
+                metric = metric.replace("_(estimated)", "estimated")
+                metric = metric.replace("_(statfs,_df)", "statfs")
                 value = measurementLinesSection[1].strip().split("\t")[0]
                 outputstr += "{}={},".format(metric, value)
             print(outputstr.strip(","))
