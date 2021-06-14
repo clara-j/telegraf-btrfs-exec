@@ -51,6 +51,26 @@ Currently it captures the following information for all the pools mounted at the
 * corrected_errors
 * last_physical
 
+# Example output
+```
+btrfs_stat,pool=/,drive=/dev/mapper/luks-0ff56354-f5c9-45b2-852c-a456641e5722 write_io_errs=0,read_io_errs=0,flush_io_errs=0,corruption_errs=0,generation_errs=0
+btrfs_df,type=Data,raidType=single,pool=/ total=30073159680,used=27799445504,free=2273714176
+btrfs_df,type=System,raidType=single,pool=/ total=4194304,used=16384,free=4177920
+btrfs_df,type=Metadata,raidType=single,pool=/ total=2155872256,used=1173159936,free=982712320
+btrfs_df,type=GlobalReserve,raidType=single,pool=/ total=79544320,used=0,free=79544320
+btrfs_usage,pool=/ device_size=254339448832,device_allocated=32233226240,device_unallocated=222106222592,device_missing=0,used=28972621824,free_estimated=224379936768,free_statfs=224378888192,data_ratio=1.00,metadata_ratio=1.00,global_reserve=79544320,multiple_profiles=no
+btrfs_usage,pool=/,drive=/dev/mapper/luks-0ff56354-f5c9-45b2-852c-a456641e5722 Data=30073159680,Metadata=2155872256,System=4194304,Unallocated=222106222592
+btrfs_scrub,pool=/ data_extents_scrubbed=0,tree_extents_scrubbed=0,data_bytes_scrubbed=0,tree_bytes_scrubbed=0,read_errors=0,csum_errors=0,verify_errors=0,no_csum=0,csum_discards=0,super_errors=0,malloc_errors=0,uncorrectable_errors=0,unverified_errors=0,corrected_errors=0,last_physical=0
+btrfs_stat,pool=/home,drive=/dev/mapper/luks-0ff56354-f5c9-45b2-852c-a456641e5722 write_io_errs=0,read_io_errs=0,flush_io_errs=0,corruption_errs=0,generation_errs=0
+btrfs_df,type=Data,raidType=single,pool=/home total=30073159680,used=27799445504,free=2273714176
+btrfs_df,type=System,raidType=single,pool=/home total=4194304,used=16384,free=4177920
+btrfs_df,type=Metadata,raidType=single,pool=/home total=2155872256,used=1173159936,free=982712320
+btrfs_df,type=GlobalReserve,raidType=single,pool=/home total=79544320,used=0,free=79544320
+btrfs_usage,pool=/home device_size=254339448832,device_allocated=32233226240,device_unallocated=222106222592,device_missing=0,used=28972621824,free_estimated=224379936768,free_statfs=224378888192,data_ratio=1.00,metadata_ratio=1.00,global_reserve=79544320,multiple_profiles=no
+btrfs_usage,pool=/home,drive=/dev/mapper/luks-0ff56354-f5c9-45b2-852c-a456641e5722 Data=30073159680,Metadata=2155872256,System=4194304,Unallocated=222106222592
+btrfs_scrub,pool=/home data_extents_scrubbed=0,tree_extents_scrubbed=0,data_bytes_scrubbed=0,tree_bytes_scrubbed=0,read_errors=0,csum_errors=0,verify_errors=0,no_csum=0,csum_discards=0,super_errors=0,malloc_errors=0,uncorrectable_errors=0,unverified_errors=0,corrected_errors=0,last_physical=0
+```
+
 # Usage
 1. Install and place btrfs.read.py in location accessible by telgraf.   For example /etc/telegraf/btrfs.read.py
 2. Grant telegraf permission to sudo btrfs command without password by adding a line similar to the following to /etc/sudoers
@@ -63,7 +83,7 @@ You can discover the proper btrfs location by issuing `command -v btrfs` on your
 ```
  [[inputs.exec]]
    commands = [
-     "python /etc/telegraf/btrfs.read.py"
+     "python3 /etc/telegraf/btrfs.read.py"
    ]
    timeout = "5s"
    data_format = "influx"
@@ -72,8 +92,3 @@ You can discover the proper btrfs location by issuing `command -v btrfs` on your
 # Requirements
 * python3
 * btrfs-tools
-
-# Donation
-If you find this useful and you would like to support please the use option below.
-
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=jason%2ep%2eclara%40gmail%2ecom&lc=CA&item_name=Jason%20Clara&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
