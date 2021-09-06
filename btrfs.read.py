@@ -147,7 +147,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             # skip the "overall" section with a slice
             outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
-                if any(k in j for k in ["Multiple_profiles"]):
+                if any(k in j for k in ["Multiple_profiles", "Multiple profiles"]):
                     continue
                 measurementLinesSection = j.split(":")
                 # separate lines to meet flake8 requirements
