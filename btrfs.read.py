@@ -21,10 +21,11 @@ def _find_binaries():
     return btrfs, findmnt, sudo
 
 
-def getPools(excludeList, find_path="findmnt"):
-    poolsRAW = subprocess.Popen([find_path, "-o", "TARGET", "--list",
-                                 "-nt", "btrfs"],
-                                stdout=subprocess.PIPE)
+def getPools(excludeList, find_path="findmnt", fstab=False):
+    function = [find_path, "-o", "TARGET", "--list", "-nt", "btrfs"]
+    if fstab:
+        function.append("--fstab")
+    poolsRAW = subprocess.Popen(function, stdout=subprocess.PIPE)
     output = poolsRAW.communicate()[0].decode("utf-8")
     output = [p for p in output.split("\n")
               if p and p not in excludeList]
@@ -222,6 +223,8 @@ def cli_opts():
                         help="Show debug information")
     parser.add_argument("-e", "--exclude-pools", default="",
                         help="arrays/mounts to exclude (comma-separated)")
+    parser.add_argument("--only-fstab", action="store_true", default=False,
+                        help="only process filesystems listed in /etc/fstab")
     return parser.parse_args()
 
 
@@ -230,7 +233,7 @@ if __name__ == "__main__":
     if args.debug:
         log.setLevel(logging.DEBUG)
     btrfs, findmnt, sudo = _find_binaries()
-    pools = getPools(args.exclude_pools.split(","), findmnt)
+    pools = getPools(args.exclude_pools.split(","), findmnt, args.only_fstab)
     log.debug(pools)
 
     for pool in pools:
