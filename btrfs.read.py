@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from distutils.version import LooseVersion
 import logging
 import re
 import shutil
@@ -21,6 +22,18 @@ def _find_binaries():
     return btrfs, findmnt, sudo
 
 
+def getVersion(btrfs="btrfs"):
+    """
+    Some command output has shifted significantly
+    between versions
+    Here we'll get the btrfs-progs version to
+    properly filter other commands
+    """
+    raw = subprocess.Popen([btrfs, "--version"], stdout=subprocess.PIPE)
+    versionstr = raw.communicate()[0].decode("utf-8")
+    return versionstr.split()[-1].strip("v")
+
+
 def getPools(excludeList, find_path="findmnt", fstab=False):
     function = [find_path, "-o", "TARGET", "--list", "-nt", "btrfs"]
     if fstab:
@@ -32,51 +45,95 @@ def getPools(excludeList, find_path="findmnt", fstab=False):
     return output
 
 
-def scrub_stats(pool, sudo="sudo", btrfs="btrfs"):
+def scrub_stats(pool, version, sudo="sudo", btrfs="btrfs"):
     """
-    # one of the following
-    scrub status for b24cf3ce-6063-4c63-8141-8c080e6d9bf4
-    UUID:             25cc55b6-cb1b-4aa6-917b-d979c0567c1b
-        # one of the following:
-         no stats available
-         scrub started at Sat Nov  7 21:24:20 2020, running for 00:00:25
-         scrub started at Fri Nov  6 06:15:01 2020 and finished after 00:00:30
-        data_extents_scrubbed: 275088
-        tree_extents_scrubbed: 9942
-        data_bytes_scrubbed: 10591723520
-        tree_bytes_scrubbed: 162889728
-        read_errors: 0
-        csum_errors: 0
-        verify_errors: 0
-        no_csum: 1958
-        csum_discards: 0
-        super_errors: 0
-        malloc_errors: 0
-        uncorrectable_errors: 0
-        unverified_errors: 0
-        corrected_errors: 0
-        last_physical: 17235443712
+    scrub stats actually live at /var/lib/btrfs/scrub.*
+    The problem is they're 600 owned by root
+
+    4.20 example:
+        # one of the following
+        scrub status for b24cf3ce-6063-4c63-8141-8c080e6d9bf4
+        UUID:             25cc55b6-cb1b-4aa6-917b-d979c0567c1b
+            # one of the following:
+             no stats available
+             scrub started at Sat Nov  7 21:24:20 2020, running for 00:00:25
+             scrub started at Fri Nov  6 06:15:01 2020 and finished after 00:00:30
+            data_extents_scrubbed: 275088
+            tree_extents_scrubbed: 9942
+            data_bytes_scrubbed: 10591723520
+            tree_bytes_scrubbed: 162889728
+            read_errors: 0
+            csum_errors: 0
+            verify_errors: 0
+            no_csum: 1958
+            csum_discards: 0
+            super_errors: 0
+            malloc_errors: 0
+            uncorrectable_errors: 0
+            unverified_errors: 0
+            corrected_errors: 0
+            last_physical: 17235443712
+
+    5.10 example:
+        UUID:             d96d8fed-adf2-498d-94d8-daa7c9422b0e
+        Scrub started:    Fri Sep 24 08:15:01 2021
+        Status:           finished
+        Duration:         3:36:46
+            data_extents_scrubbed: 149200694
+            tree_extents_scrubbed: 750045
+            data_bytes_scrubbed: 9698925363200
+            tree_bytes_scrubbed: 12288737280
+            read_errors: 0
+            csum_errors: 0
+            verify_errors: 0
+            no_csum: 589440
+            csum_discards: 0
+            super_errors: 0
+            malloc_errors: 0
+            uncorrectable_errors: 0
+            unverified_errors: 0
+            corrected_errors: 0
+            last_physical: 2478272675840
     """
     commandString = subprocess.Popen([sudo, btrfs, "scrub", "status",
                                       "-R", pool],
                                      stdout=subprocess.PIPE)
     output = "btrfs_scrub,pool={} ".format(pool)
-    time_taken_re = "(\d{2}:\d{2}:\d{2})$"
-    for line in commandString.communicate()[0].decode("utf-8").split("\n"):
-        line = line.strip()
-        if not line or any(line.startswith(s) for s in ["scrub status",
-                                                        "no stats",
-                                                        "UUID"]):
-            continue
-        log.debug("processing {}".format(line))
-        if line.startswith("scrub started"):
-            time_taken_match = re.search(time_taken_re, line)
-            hours, minutes, seconds = time_taken_match.group(0).strip().split(":")
-            time_taken = (3600 * int(hours)) + (60 * int(minutes)) + int(seconds)
-            output += "time_taken={},".format(time_taken)
-        else:
-            key, value = line.split(":")
-            output += "{}={},".format(key.strip(), value.strip())
+    if LooseVersion(version) >= LooseVersion("5.10"):
+        time_taken_re = r"(\d{1,2}:\d{2}:\d{2})$"
+        for line in commandString.communicate()[0].decode("utf-8").split("\n"):
+            line = line.strip()
+            if not line or any(line.startswith(s) for s in ["Scrub started",
+                                                            "Status",
+                                                            "no stats",
+                                                            "UUID"]):
+                continue
+            log.debug("processing {}".format(line))
+            if line.startswith("Duration:"):
+                time_taken_match = re.search(time_taken_re, line)
+                hours, minutes, seconds = time_taken_match.group(0).strip().split(":")
+                time_taken = (3600 * int(hours)) + (60 * int(minutes)) + int(seconds)
+                output += "time_taken={},".format(time_taken)
+            else:
+                key, value = line.split(":")
+                output += "{}={},".format(key.strip(), value.strip())
+    else:
+        time_taken_re = r"(\d{2}:\d{2}:\d{2})$"
+        for line in commandString.communicate()[0].decode("utf-8").split("\n"):
+            line = line.strip()
+            if not line or any(line.startswith(s) for s in ["scrub status",
+                                                            "no stats",
+                                                            "UUID"]):
+                continue
+            log.debug("processing {}".format(line))
+            if line.startswith("scrub started"):
+                time_taken_match = re.search(time_taken_re, line)
+                hours, minutes, seconds = time_taken_match.group(0).strip().split(":")
+                time_taken = (3600 * int(hours)) + (60 * int(minutes)) + int(seconds)
+                output += "time_taken={},".format(time_taken)
+            else:
+                key, value = line.split(":")
+                output += "{}={},".format(key.strip(), value.strip())
     print(output.strip(","))
 
 
@@ -97,7 +154,7 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         lineSections = line.replace(":", ",").split(",")
         if len(lineSections) < 2:
             continue
-        lineSections = [l.strip() for l in lineSections]
+        lineSections = [lineSec.strip() for lineSec in lineSections]
         metric, raidType, total, used = lineSections
         free = int(total.split("=")[1]) - int(used.split("=")[1])
         output = "btrfs_df,type={},raidType={},pool={}".format(metric,
@@ -148,7 +205,8 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             # skip the "overall" section with a slice
             outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
-                if any(k in j for k in ["Multiple_profiles", "Multiple profiles"]):
+                if any(k in j for k in ["Multiple_profiles",
+                                        "Multiple profiles"]):
                     continue
                 measurementLinesSection = j.split(":")
                 # separate lines to meet flake8 requirements
@@ -235,22 +293,23 @@ if __name__ == "__main__":
     btrfs, findmnt, sudo = _find_binaries()
     pools = getPools(args.exclude_pools.split(","), findmnt, args.only_fstab)
     log.debug(pools)
+    version = getVersion(btrfs)
 
     for pool in pools:
         log.debug("Processing {}".format(pool))
         try:
-            getDeviceStatMeasurements(pool)
+            getDeviceStatMeasurements(pool, sudo, btrfs)
         except Exception as e:
             log.debug("Failed to collect stats for {} :: {}".format(pool, e))
         try:
-            getFileSystemDFMeasurements(pool)
+            getFileSystemDFMeasurements(pool, sudo, btrfs)
         except Exception as e:
             log.debug("Failed to collect df for {} :: {}".format(pool, e))
         try:
-            getFileSystemUsageMeasurements(pool)
+            getFileSystemUsageMeasurements(pool, sudo, btrfs)
         except Exception as e:
             log.debug("Failed to collect usage for {} :: {}".format(pool, e))
         try:
-            scrub_stats(pool)
+            scrub_stats(pool, version, sudo, btrfs)
         except Exception as e:
             log.debug("Failed to collect scrubs for {} :: {}".format(pool, e))
