@@ -6,6 +6,7 @@ import logging
 import re
 import shutil
 import subprocess
+
 log = logging.getLogger("telegraf-btrfs")
 log.setLevel(logging.INFO)
 ch = logging.StreamHandler()
@@ -40,8 +41,7 @@ def getPools(excludeList, find_path="findmnt", fstab=False):
         function.append("--fstab")
     poolsRAW = subprocess.Popen(function, stdout=subprocess.PIPE)
     output = poolsRAW.communicate()[0].decode("utf-8")
-    output = [p for p in output.split("\n")
-              if p and p not in excludeList]
+    output = [p for p in output.split("\n") if p and p not in excludeList]
     return output
 
 
@@ -95,18 +95,18 @@ def scrub_stats(pool, version, sudo="sudo", btrfs="btrfs"):
             corrected_errors: 0
             last_physical: 2478272675840
     """
-    commandString = subprocess.Popen([sudo, btrfs, "scrub", "status",
-                                      "-R", pool],
-                                     stdout=subprocess.PIPE)
+    commandString = subprocess.Popen(
+        [sudo, btrfs, "scrub", "status", "-R", pool], stdout=subprocess.PIPE
+    )
     output = "btrfs_scrub,pool={} ".format(pool)
     if LooseVersion(version) >= LooseVersion("5.10"):
         time_taken_re = r"(\d{1,2}:\d{2}:\d{2})$"
         for line in commandString.communicate()[0].decode("utf-8").split("\n"):
             line = line.strip()
-            if not line or any(line.startswith(s) for s in ["Scrub started",
-                                                            "Status",
-                                                            "no stats",
-                                                            "UUID"]):
+            if not line or any(
+                line.startswith(s)
+                for s in ["Scrub started", "Status", "no stats", "UUID"]
+            ):
                 continue
             log.debug("processing {}".format(line))
             if line.startswith("Duration:"):
@@ -121,9 +121,9 @@ def scrub_stats(pool, version, sudo="sudo", btrfs="btrfs"):
         time_taken_re = r"(\d{2}:\d{2}:\d{2})$"
         for line in commandString.communicate()[0].decode("utf-8").split("\n"):
             line = line.strip()
-            if not line or any(line.startswith(s) for s in ["scrub status",
-                                                            "no stats",
-                                                            "UUID"]):
+            if not line or any(
+                line.startswith(s) for s in ["scrub status", "no stats", "UUID"]
+            ):
                 continue
             log.debug("processing {}".format(line))
             if line.startswith("scrub started"):
@@ -144,9 +144,9 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     Metadata, single: total=2155872256, used=163217408
     GlobalReserve, single: total=26869760, used=0
     """
-    commandString = subprocess.Popen([sudo, btrfs, "filesystem", "df",
-                                      "-b", pool],
-                                     stdout=subprocess.PIPE)
+    commandString = subprocess.Popen(
+        [sudo, btrfs, "filesystem", "df", "-b", pool], stdout=subprocess.PIPE
+    )
     # split into section
     for line in commandString.communicate()[0].decode("utf-8").split("\n"):
         if not line:
@@ -157,11 +157,8 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         lineSections = [lineSec.strip() for lineSec in lineSections]
         metric, raidType, total, used = lineSections
         free = int(total.split("=")[1]) - int(used.split("=")[1])
-        output = "btrfs_df,type={},raidType={},pool={}".format(metric,
-                                                               raidType,
-                                                               pool)
-        print("{} {},{},free={}".format(output, total,
-                                        used, free))
+        output = "btrfs_df,type={},raidType={},pool={}".format(metric, raidType, pool)
+        print("{} {},{},free={}".format(output, total, used, free))
 
 
 def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
@@ -191,9 +188,9 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     Unallocated:
        /dev/md125	229633949696
     """
-    commandString = subprocess.Popen([sudo, btrfs, "filesystem", "usage",
-                                      "-b", pool],
-                                     stdout=subprocess.PIPE)
+    commandString = subprocess.Popen(
+        [sudo, btrfs, "filesystem", "usage", "-b", pool], stdout=subprocess.PIPE
+    )
     output = "btrfs_usage,pool={}".format(pool)
     # split into section
     commandArray = commandString.communicate()[0].decode("utf-8").split("\n\n")
@@ -205,8 +202,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
             # skip the "overall" section with a slice
             outputstr = "{} ".format(output)
             for j in measurementLines[1:]:
-                if any(k in j for k in ["Multiple_profiles",
-                                        "Multiple profiles"]):
+                if any(k in j for k in ["Multiple_profiles", "Multiple profiles"]):
                     continue
                 measurementLinesSection = j.split(":")
                 # separate lines to meet flake8 requirements
@@ -225,9 +221,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                 measurementLinesSection = j.strip().split("\t")
                 drive = measurementLinesSection[0].strip()
                 value = measurementLinesSection[1].strip()
-                log.debug("Drive: {}, Type: {}, Value: {}".format(drive,
-                                                                  btype,
-                                                                  value))
+                log.debug("Drive: {}, Type: {}, Value: {}".format(drive, btype, value))
                 if drive in drives:
                     drives[drive][btype] = value
                 else:
@@ -247,22 +241,21 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     [/dev/md125].corruption_errs  0
     [/dev/md125].generation_errs  0
     """
-    statString = subprocess.Popen([sudo, btrfs, "device", "stat", pool],
-                                  stdout=subprocess.PIPE)
-    statArray = statString.communicate()[0].decode("utf-8").split('\n')
+    statString = subprocess.Popen(
+        [sudo, btrfs, "device", "stat", pool], stdout=subprocess.PIPE
+    )
+    statArray = statString.communicate()[0].decode("utf-8").split("\n")
     output = "btrfs_stat,pool={}".format(pool)
     drives = {}
     for stat in statArray:
         a = stat.split()
         if len(a) < 2:
             continue
-        b = a[0].split('.')
+        b = a[0].split(".")
         drive = b[0].replace("[", "").replace("]", "")
         metric = b[1]
         value = a[1]
-        log.debug("Drive: {}, Metric: {}, Value: {}".format(drive,
-                                                            metric,
-                                                            value))
+        log.debug("Drive: {}, Metric: {}, Value: {}".format(drive, metric, value))
         if drive in drives:
             drives[drive][metric] = value
         else:
@@ -275,14 +268,25 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
 
 
 def cli_opts():
-    parser = ArgumentParser(description="Collect stats from btrfs volumes",
-                            formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--debug", action="store_true", default=False,
-                        help="Show debug information")
-    parser.add_argument("-e", "--exclude-pools", default="",
-                        help="arrays/mounts to exclude (comma-separated)")
-    parser.add_argument("--only-fstab", action="store_true", default=False,
-                        help="only process filesystems listed in /etc/fstab")
+    parser = ArgumentParser(
+        description="Collect stats from btrfs volumes",
+        formatter_class=ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--debug", action="store_true", default=False, help="Show debug information"
+    )
+    parser.add_argument(
+        "-e",
+        "--exclude-pools",
+        default="",
+        help="arrays/mounts to exclude (comma-separated)",
+    )
+    parser.add_argument(
+        "--only-fstab",
+        action="store_true",
+        default=False,
+        help="only process filesystems listed in /etc/fstab",
+    )
     return parser.parse_args()
 
 
