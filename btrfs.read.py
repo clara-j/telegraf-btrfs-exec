@@ -195,7 +195,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         measurementLines = section.split("\n")
         if "Overall:" in measurementLines[0]:
             # skip the "overall" section with a slice
-            outputstr += " "
+            outputstr = f"{output} "
             for j in measurementLines[1:]:
                 if any(k in j for k in ["Multiple_profiles", "Multiple profiles"]):
                     continue
