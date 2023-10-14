@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from distutils.version import LooseVersion
 import logging
 import re
 import shutil
@@ -23,7 +22,7 @@ def _find_binaries():
     return btrfs, findmnt, sudo
 
 
-def getVersion(btrfs="btrfs"):
+def get_version(btrfs="btrfs"):
     """
     Some command output has shifted significantly
     between versions
@@ -32,7 +31,7 @@ def getVersion(btrfs="btrfs"):
     """
     raw = subprocess.Popen([btrfs, "--version"], stdout=subprocess.PIPE)
     versionstr = raw.communicate()[0].decode("utf-8")
-    return versionstr.split()[-1].strip("v")
+    return versionstr.split()[-1].strip("v").split(".")
 
 
 def getPools(excludeList, find_path="findmnt", fstab=False):
@@ -98,42 +97,38 @@ def scrub_stats(pool, version, sudo="sudo", btrfs="btrfs"):
     commandString = subprocess.Popen(
         [sudo, btrfs, "scrub", "status", "-R", pool], stdout=subprocess.PIPE
     )
-    output = "btrfs_scrub,pool={} ".format(pool)
-    if LooseVersion(version) >= LooseVersion("5.10"):
+    output = f"btrfs_scrub,pool={pool} "
+    headers = ["Scrub started", "Status", "no stats", "UUID"]
+    if int(version[0]) > 5 or (int(version[0]) == 5 and int(version[1]) >= 10):
         time_taken_re = r"(\d{1,2}:\d{2}:\d{2})$"
         for line in commandString.communicate()[0].decode("utf-8").split("\n"):
             line = line.strip()
-            if not line or any(
-                line.startswith(s)
-                for s in ["Scrub started", "Status", "no stats", "UUID"]
-            ):
+            if not line or any(line.startswith(s) for s in headers):
                 continue
-            log.debug("processing {}".format(line))
+            log.debug(f"processing {line}")
             if line.startswith("Duration:"):
                 time_taken_match = re.search(time_taken_re, line)
                 hours, minutes, seconds = time_taken_match.group(0).strip().split(":")
                 time_taken = (3600 * int(hours)) + (60 * int(minutes)) + int(seconds)
-                output += "time_taken={},".format(time_taken)
+                output += f"time_taken={time_taken},"
             else:
                 key, value = line.split(":")
-                output += "{}={},".format(key.strip(), value.strip())
+                output += f"{key.strip()}={value.strip()},"
     else:
         time_taken_re = r"(\d{2}:\d{2}:\d{2})$"
         for line in commandString.communicate()[0].decode("utf-8").split("\n"):
             line = line.strip()
-            if not line or any(
-                line.startswith(s) for s in ["scrub status", "no stats", "UUID"]
-            ):
+            if not line or any(line.startswith(s) for s in headers):
                 continue
-            log.debug("processing {}".format(line))
+            log.debug(f"processing {line}")
             if line.startswith("scrub started"):
                 time_taken_match = re.search(time_taken_re, line)
                 hours, minutes, seconds = time_taken_match.group(0).strip().split(":")
                 time_taken = (3600 * int(hours)) + (60 * int(minutes)) + int(seconds)
-                output += "time_taken={},".format(time_taken)
+                output += f"time_taken={time_taken},"
             else:
                 key, value = line.split(":")
-                output += "{}={},".format(key.strip(), value.strip())
+                output += f"{key.strip()}={value.strip()},"
     print(output.strip(","))
 
 
@@ -155,10 +150,10 @@ def getFileSystemDFMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         if len(lineSections) < 2:
             continue
         lineSections = [lineSec.strip() for lineSec in lineSections]
-        metric, raidType, total, used = lineSections
+        metric, raid_type, total, used = lineSections
         free = int(total.split("=")[1]) - int(used.split("=")[1])
-        output = "btrfs_df,type={},raidType={},pool={}".format(metric, raidType, pool)
-        print("{} {},{},free={}".format(output, total, used, free))
+        output = f"btrfs_df,type={metric},raidType={raid_type},pool={pool}"
+        print(f"{output} {total},{used},free={free}")
 
 
 def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
@@ -191,7 +186,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
     commandString = subprocess.Popen(
         [sudo, btrfs, "filesystem", "usage", "-b", pool], stdout=subprocess.PIPE
     )
-    output = "btrfs_usage,pool={}".format(pool)
+    output = f"btrfs_usage,pool={pool}"
     # split into section
     commandArray = commandString.communicate()[0].decode("utf-8").split("\n\n")
     drives = {}
@@ -200,7 +195,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         measurementLines = section.split("\n")
         if "Overall:" in measurementLines[0]:
             # skip the "overall" section with a slice
-            outputstr = "{} ".format(output)
+            outputstr += " "
             for j in measurementLines[1:]:
                 if any(k in j for k in ["Multiple_profiles", "Multiple profiles"]):
                     continue
@@ -211,7 +206,7 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                 metric = metric.replace("_(estimated)", "_estimated")
                 metric = metric.replace("_(statfs,_df)", "_statfs")
                 value = measurementLinesSection[1].strip().split("\t")[0]
-                outputstr += "{}={},".format(metric, value)
+                outputstr += f"{metric}={value},"
             print(outputstr.strip(","))
         else:
             btype = measurementLines[0].replace(":", ",").split(",")[0]
@@ -221,15 +216,15 @@ def getFileSystemUsageMeasurements(pool, sudo="sudo", btrfs="btrfs"):
                 measurementLinesSection = j.strip().split("\t")
                 drive = measurementLinesSection[0].strip()
                 value = measurementLinesSection[1].strip()
-                log.debug("Drive: {}, Type: {}, Value: {}".format(drive, btype, value))
+                log.debug(f"Drive: {drive}, Type: {btype}, Value: {value}")
                 if drive in drives:
                     drives[drive][btype] = value
                 else:
                     drives[drive] = {btype: value}
     for drive, data in drives.items():
-        outputstr = "{},drive={} ".format(output, drive)
+        outputstr = f"{output},drive={drive} "
         for k, v in data.items():
-            outputstr += "{}={},".format(k, v)
+            outputstr += f"{k}={v},"
         print(outputstr.strip(","))
 
 
@@ -245,7 +240,7 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         [sudo, btrfs, "device", "stat", pool], stdout=subprocess.PIPE
     )
     statArray = statString.communicate()[0].decode("utf-8").split("\n")
-    output = "btrfs_stat,pool={}".format(pool)
+    output = f"btrfs_stat,pool={pool}"
     drives = {}
     for stat in statArray:
         a = stat.split()
@@ -255,15 +250,15 @@ def getDeviceStatMeasurements(pool, sudo="sudo", btrfs="btrfs"):
         drive = b[0].replace("[", "").replace("]", "")
         metric = b[1]
         value = a[1]
-        log.debug("Drive: {}, Metric: {}, Value: {}".format(drive, metric, value))
+        log.debug(f"Drive: {drive}, Metric: {metric}, Value: {value}")
         if drive in drives:
             drives[drive][metric] = value
         else:
             drives[drive] = {metric: value}
     for drive, data in drives.items():
-        outputstr = "{},drive={} ".format(output, drive)
+        outputstr = f"{output},drive={drive} "
         for k, v in data.items():
-            outputstr += "{}={},".format(k, v)
+            outputstr += f"{k}={v},"
         print(outputstr.strip(","))
 
 
@@ -297,23 +292,23 @@ if __name__ == "__main__":
     btrfs, findmnt, sudo = _find_binaries()
     pools = getPools(args.exclude_pools.split(","), findmnt, args.only_fstab)
     log.debug(pools)
-    version = getVersion(btrfs)
+    version = get_version(btrfs)
 
     for pool in pools:
-        log.debug("Processing {}".format(pool))
+        log.debug(f"Processing {pool}")
         try:
             getDeviceStatMeasurements(pool, sudo, btrfs)
         except Exception as e:
-            log.debug("Failed to collect stats for {} :: {}".format(pool, e))
+            log.debug(f"Failed to collect stats for {pool} :: {e}")
         try:
             getFileSystemDFMeasurements(pool, sudo, btrfs)
         except Exception as e:
-            log.debug("Failed to collect df for {} :: {}".format(pool, e))
+            log.debug(f"Failed to collect df for {pool} :: {e}")
         try:
             getFileSystemUsageMeasurements(pool, sudo, btrfs)
         except Exception as e:
-            log.debug("Failed to collect usage for {} :: {}".format(pool, e))
+            log.debug(f"Failed to collect usage for {pool} :: {e}")
         try:
             scrub_stats(pool, version, sudo, btrfs)
         except Exception as e:
-            log.debug("Failed to collect scrubs for {} :: {}".format(pool, e))
+            log.debug(f"Failed to collect scrubs for {pool} :: {e}")
